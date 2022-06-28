@@ -2,5 +2,11 @@
   "name": "submakerliquity",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@liquity/contracts": "^1.0.0"
+  },
+  "devDependencies": {
+    "solc": "0.6.11"
+  }
 }
