@@ -1,9 +1,13 @@
 pragma solidity ^0.6.11;
 
-import "forge-std/Test.sol";
+import "liquity/Dependencies/LiquityBase.sol";
 import "src/BorrowerOperationsDai.sol";
-import "./mocks/MockToken.sol";
+import "src/StableOutput/FeeDistributor.sol";
 import "./mocks/MockLendingPool.sol";
+import "./mocks/MockToken.sol";
+import "./mocks/MockPriceFeed.sol";
+
+import {console as console, Test as FTest} from "forge-std/Test.sol";
 
 /**
  * Liquity imports
@@ -14,24 +18,27 @@ import "liquity/DefaultPool.sol";
 import "liquity/StabilityPool.sol";
 import "liquity/GasPool.sol";
 import "liquity/CollSurplusPool.sol";
-import "liquity/TestContracts/PriceFeedTester.sol";
+import "liquity/TestContracts/PriceFeedTestnet.sol";
 import "liquity/SortedTroves.sol";
 import "liquity/LQTY/LQTYStaking.sol";
 import "liquity/LQTY/CommunityIssuance.sol";
 
-contract BorrowerOperationsDaiTest is Test {
+
+contract BorrowerOperationsDaiTest is FTest {
     BorrowerOperationsDai public bo;
+    MockToken public token;
+    MockToken public lqtyToken;
+    FeeDistributor public fd;
+    MockLendingPool public lp;
+
     address public constant BORROWER = address(uint(-2));
 
     function setUp() public {
-        // give BORROWER 1000 ETH
-        vm.deal(BORROWER, 1000e18);
-
-        MockToken token = new MockToken();
-        MockToken lqtyToken = new MockToken();
+        token = new MockToken();
+        lqtyToken = new MockToken();
         token.mint(address(this), 1337 * 1e18);
-        MockLendingPool lp = new MockLendingPool(token);
-        token.approve(100 * 1e18, address(lp));
+        lp = new MockLendingPool(IERC20(address(token)));
+        token.approve(address(lp), 100 * 1e18);
         lp.give(100 * 1e18);
 
         bo = new BorrowerOperationsDai();
@@ -41,14 +48,15 @@ contract BorrowerOperationsDaiTest is Test {
         StabilityPool sp = new StabilityPool();
         GasPool gp = new GasPool();
         CollSurplusPool csp = new CollSurplusPool();
-        PriceFeedTester pf = new PriceFeedTester();
+        MockPriceFeed pf = new MockPriceFeed();
         SortedTroves st = new SortedTroves();
         LQTYStaking stk = new LQTYStaking();
+        CommunityIssuance ci = new CommunityIssuance();
 
-        pf.setLastGoodPrice(1000e18);
-        pf.setStatus(
-            pf.Status.chainlinkWorking
-        );
+        lqtyToken.mint(address(ci), 1<<255);
+
+        pf.setPrice(2200 * 1e18);
+        console.log(pf.getPrice(), pf.fetchPrice());
 
         // Set addresses for all used contracts
         // NOTE: we're using as many base LQTY contracts here as possible
@@ -100,14 +108,42 @@ contract BorrowerOperationsDaiTest is Test {
             address(lqtyToken),
             address(sp)
         );
+
+        makeFD(address(bo));
+
+        bo.setAddresses(
+            address(tm),
+            address(ap),
+            address(dp),
+            address(sp),
+            address(gp),
+            address(csp),
+            address(pf),
+            address(token),
+            address(st),
+            address(lqtyToken),
+            address(lp),
+            address(fd)
+        );
+    }
+
+    function makeFD(address bo) internal {
+        fd = new FeeDistributor(
+            address(bo),
+            IERC20(address(token)),
+            address(1),
+            address(2)
+        );
     }
 
     function testOpenTrove() public {
+        console.log("TESTOPENTROVE", bo.priceFeed().fetchPrice());
+        vm.deal(BORROWER, 2<<128);
         vm.prank(BORROWER);
         bo.openTrove(
-            5,
+            (1e18 / 1000) * 6,
             1e18,
-            address(1),
+            address(0),
             address(0)
         );
     }
