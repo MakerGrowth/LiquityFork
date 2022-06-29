@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL3
 pragma solidity ^0.6.11;
+
 import "liquity/BorrowerOperations.sol";
 import "./StableInput/ILendingPool.sol";
 import "./StableOutput/IFeeDistributor.sol";
@@ -104,8 +105,8 @@ contract BorrowerOperationsDai is BorrowerOperations {
         // increase user's debt by _LUSDFee, giving the fee to the _feeDistributor
         _withdrawLUSD(activePool, _lusdToken, address(feeDistributor), LUSDFee, LUSDFee);
 
-        _lusdToken.approve(address(_feeDistributor), LUSDFee);
-        _feeDistributor.pushFees(LUSDFee);
+        _lusdToken.approve(address(feeDistributor), LUSDFee);
+        feeDistributor.pushFees(LUSDFee);
         return LUSDFee;
     }
 
