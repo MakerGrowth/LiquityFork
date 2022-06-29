@@ -48,21 +48,66 @@ contract BorrowerOperationsDai is BorrowerOperations {
         address _feeDistributor
     )
         external
-        override
         onlyOwner
     {
-        super.setAddresses(
-            _troveManagerAddress,
-            _activePoolAddress,
-            _defaultPoolAddress,
-            _stabilityPoolAddress,
-            _gasPoolAddress,
-            _collSurplusPoolAddress,
-            _priceFeedAddress,
-            _sortedTrovesAddress,
-            _lusdTokenAddress,
-            _lqtyStakingAddress
-        );
+        /**
+         * since super.setAddresses is external we can't call it here.
+         * the next best thing is to copy-paste the code.. sadly
+         * ideally we'd call
+         * super.setAddresses(
+         *     _troveManagerAddress,
+         *     _activePoolAddress,
+         *     _defaultPoolAddress,
+         *     _stabilityPoolAddress,
+         *     _gasPoolAddress,
+         *     _collSurplusPoolAddress,
+         *     _priceFeedAddress,
+         *     _sortedTrovesAddress,
+         *     _lusdTokenAddress,
+         *     _lqtyStakingAddress
+         * );
+         */
+        
+        // BEGIN COPYPASTE
+        // This makes impossible to open a trove with zero withdrawn LUSD
+        assert(MIN_NET_DEBT > 0);
+
+        checkContract(_troveManagerAddress);
+        checkContract(_activePoolAddress);
+        checkContract(_defaultPoolAddress);
+        checkContract(_stabilityPoolAddress);
+        checkContract(_gasPoolAddress);
+        checkContract(_collSurplusPoolAddress);
+        checkContract(_priceFeedAddress);
+        checkContract(_sortedTrovesAddress);
+        checkContract(_lusdTokenAddress);
+        checkContract(_lqtyStakingAddress);
+
+        troveManager = ITroveManager(_troveManagerAddress);
+        activePool = IActivePool(_activePoolAddress);
+        defaultPool = IDefaultPool(_defaultPoolAddress);
+        stabilityPoolAddress = _stabilityPoolAddress;
+        gasPoolAddress = _gasPoolAddress;
+        collSurplusPool = ICollSurplusPool(_collSurplusPoolAddress);
+        priceFeed = IPriceFeed(_priceFeedAddress);
+        sortedTroves = ISortedTroves(_sortedTrovesAddress);
+        lusdToken = ILUSDToken(_lusdTokenAddress);
+        lqtyStakingAddress = _lqtyStakingAddress;
+        lqtyStaking = ILQTYStaking(_lqtyStakingAddress);
+
+        emit TroveManagerAddressChanged(_troveManagerAddress);
+        emit ActivePoolAddressChanged(_activePoolAddress);
+        emit DefaultPoolAddressChanged(_defaultPoolAddress);
+        emit StabilityPoolAddressChanged(_stabilityPoolAddress);
+        emit GasPoolAddressChanged(_gasPoolAddress);
+        emit CollSurplusPoolAddressChanged(_collSurplusPoolAddress);
+        emit PriceFeedAddressChanged(_priceFeedAddress);
+        emit SortedTrovesAddressChanged(_sortedTrovesAddress);
+        emit LUSDTokenAddressChanged(_lusdTokenAddress);
+        emit LQTYStakingAddressChanged(_lqtyStakingAddress);
+
+        _renounceOwnership();
+        // END COPYPASTE
 
         lendingPool = ILendingPool(_lendingPool);
         feeDistributor = IFeeDistributor(_feeDistributor);
