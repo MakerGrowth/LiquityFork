@@ -21,20 +21,8 @@ library Math {
  *      do, check out `BorrowerOperations.sol`
  */
 contract BorrowerOperationsDai is BorrowerOperations {
-    ILendingPool public _lendingPool;
-    IFeeDistributor public _feeDistributor;
-
-    // FIXME: Use BorrowerOperations' constructor and use _LUSD in place of _dai.
-    // NOTE:  This is handled by calling `setAddresses(address...)` defined in BorrowerOperations.sol
-
-    // TODO:  Take fee from balance taken from the lending pool.
-    //        Effectively, set the user's trove debt to their required dai amount
-    //        plus the fees while just giving them what they asked for.
-
-    constructor(ILendingPool lendingPool, IFeeDistributor feeDistributor, IERC20 dai) public {
-        _lendingPool = lendingPool;
-        _feeDistributor = feeDistributor;
-    }
+    ILendingPool public lendingPool;
+    IFeeDistributor public feeDistributor;
 
     modifier ensureAllowanceIsAtLeast(address from, address to, uint256 requiredAllowance) {
         if (lusdToken.allowance(from, to) < requiredAllowance) {
@@ -42,6 +30,41 @@ contract BorrowerOperationsDai is BorrowerOperations {
             lusdToken.approve(to, Math.MAX_UINT);
         }
         _;
+    }
+
+    function setAddresses(
+        address _troveManagerAddress,
+        address _activePoolAddress,
+        address _defaultPoolAddress,
+        address _stabilityPoolAddress,
+        address _gasPoolAddress,
+        address _collSurplusPoolAddress,
+        address _priceFeedAddress,
+        address _sortedTrovesAddress,
+        address _lusdTokenAddress,
+        address _lqtyStakingAddress,
+        address _lendingPool,
+        address _feeDistributor
+    )
+        external
+        override
+        onlyOwner
+    {
+        super.setAddresses(
+            _troveManagerAddress,
+            _activePoolAddress,
+            _defaultPoolAddress,
+            _stabilityPoolAddress,
+            _gasPoolAddress,
+            _collSurplusPoolAddress,
+            _priceFeedAddress,
+            _sortedTrovesAddress,
+            _lusdTokenAddress,
+            _lqtyStakingAddress
+        );
+
+        lendingPool = ILendingPool(_lendingPool);
+        feeDistributor = IFeeDistributor(_feeDistributor);
     }
 
     /**
@@ -56,7 +79,7 @@ contract BorrowerOperationsDai is BorrowerOperations {
         uint _netDebtIncrease
     ) internal override {
         _activePool.increaseLUSDDebt(_netDebtIncrease);
-        _lendingPool.take(_LUSDAmount);
+        lendingPool.take(_LUSDAmount);
         _lusdToken.transfer(_account, _LUSDAmount);
     }
 
@@ -79,7 +102,7 @@ contract BorrowerOperationsDai is BorrowerOperations {
         _requireUserAcceptsFee(LUSDFee, _LUSDAmount, _maxFeePercentage);
 
         // increase user's debt by _LUSDFee, giving the fee to the _feeDistributor
-        _withdrawLUSD(activePool, _lusdToken, address(_feeDistributor), LUSDFee, LUSDFee);
+        _withdrawLUSD(activePool, _lusdToken, address(feeDistributor), LUSDFee, LUSDFee);
 
         _lusdToken.approve(address(_feeDistributor), LUSDFee);
         _feeDistributor.pushFees(LUSDFee);
@@ -95,10 +118,10 @@ contract BorrowerOperationsDai is BorrowerOperations {
         ILUSDToken _lusdToken,
         address _account,
         uint _LUSD
-    ) internal override ensureAllowanceIsAtLeast(address(this), address(_lendingPool), _LUSD) {
+    ) internal override ensureAllowanceIsAtLeast(address(this), address(lendingPool), _LUSD) {
         _activePool.decreaseLUSDDebt(_LUSD);
         _lusdToken.transferFrom(_account, address(this), _LUSD);
-        _lendingPool.give(_LUSD);
+        lendingPool.give(_LUSD);
     }
 
 }
