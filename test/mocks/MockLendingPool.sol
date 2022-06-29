@@ -9,19 +9,19 @@ contract MockLendingPool is ILendingPool {
         token = _token;
     }
 
-    function take(uint amount) public {
+    function take(uint amount) public override {
         token.transfer(msg.sender, amount);
     }
 
-    function give(uint amount) public {
+    function give(uint amount) public override {
         token.transferFrom(msg.sender, address(this), amount);
     }
 
-    function deposit(uint amount) public {
+    function deposit(uint amount) public override {
         //noop
     }
 
-    function withdraw(uint amount) public {
+    function withdraw(uint amount) public override {
         //noop
     }
 }
