@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL3
 pragma solidity ^0.6.11;
+
 import "liquity/BorrowerOperations.sol";
 import "./StableInput/ILendingPool.sol";
 import "./StableOutput/IFeeDistributor.sol";
@@ -21,20 +22,8 @@ library Math {
  *      do, check out `BorrowerOperations.sol`
  */
 contract BorrowerOperationsDai is BorrowerOperations {
-    ILendingPool public _lendingPool;
-    IFeeDistributor public _feeDistributor;
-
-    // FIXME: Use BorrowerOperations' constructor and use _LUSD in place of _dai.
-    // NOTE:  This is handled by calling `setAddresses(address...)` defined in BorrowerOperations.sol
-
-    // TODO:  Take fee from balance taken from the lending pool.
-    //        Effectively, set the user's trove debt to their required dai amount
-    //        plus the fees while just giving them what they asked for.
-
-    constructor(ILendingPool lendingPool, IFeeDistributor feeDistributor, IERC20 dai) public {
-        _lendingPool = lendingPool;
-        _feeDistributor = feeDistributor;
-    }
+    ILendingPool public lendingPool;
+    IFeeDistributor public feeDistributor;
 
     modifier ensureAllowanceIsAtLeast(address from, address to, uint256 requiredAllowance) {
         if (lusdToken.allowance(from, to) < requiredAllowance) {
@@ -42,6 +31,86 @@ contract BorrowerOperationsDai is BorrowerOperations {
             lusdToken.approve(to, Math.MAX_UINT);
         }
         _;
+    }
+
+    function setAddresses(
+        address _troveManagerAddress,
+        address _activePoolAddress,
+        address _defaultPoolAddress,
+        address _stabilityPoolAddress,
+        address _gasPoolAddress,
+        address _collSurplusPoolAddress,
+        address _priceFeedAddress,
+        address _sortedTrovesAddress,
+        address _lusdTokenAddress,
+        address _lqtyStakingAddress,
+        address _lendingPool,
+        address _feeDistributor
+    )
+        external
+        onlyOwner
+    {
+        /**
+         * since super.setAddresses is external we can't call it here.
+         * the next best thing is to copy-paste the code.. sadly
+         * ideally we'd call
+         * super.setAddresses(
+         *     _troveManagerAddress,
+         *     _activePoolAddress,
+         *     _defaultPoolAddress,
+         *     _stabilityPoolAddress,
+         *     _gasPoolAddress,
+         *     _collSurplusPoolAddress,
+         *     _priceFeedAddress,
+         *     _sortedTrovesAddress,
+         *     _lusdTokenAddress,
+         *     _lqtyStakingAddress
+         * );
+         */
+        
+        // BEGIN COPYPASTE
+        // This makes impossible to open a trove with zero withdrawn LUSD
+        assert(MIN_NET_DEBT > 0);
+
+        checkContract(_troveManagerAddress);
+        checkContract(_activePoolAddress);
+        checkContract(_defaultPoolAddress);
+        checkContract(_stabilityPoolAddress);
+        checkContract(_gasPoolAddress);
+        checkContract(_collSurplusPoolAddress);
+        checkContract(_priceFeedAddress);
+        checkContract(_sortedTrovesAddress);
+        checkContract(_lusdTokenAddress);
+        checkContract(_lqtyStakingAddress);
+
+        troveManager = ITroveManager(_troveManagerAddress);
+        activePool = IActivePool(_activePoolAddress);
+        defaultPool = IDefaultPool(_defaultPoolAddress);
+        stabilityPoolAddress = _stabilityPoolAddress;
+        gasPoolAddress = _gasPoolAddress;
+        collSurplusPool = ICollSurplusPool(_collSurplusPoolAddress);
+        priceFeed = IPriceFeed(_priceFeedAddress);
+        sortedTroves = ISortedTroves(_sortedTrovesAddress);
+        lusdToken = ILUSDToken(_lusdTokenAddress);
+        lqtyStakingAddress = _lqtyStakingAddress;
+        lqtyStaking = ILQTYStaking(_lqtyStakingAddress);
+
+        emit TroveManagerAddressChanged(_troveManagerAddress);
+        emit ActivePoolAddressChanged(_activePoolAddress);
+        emit DefaultPoolAddressChanged(_defaultPoolAddress);
+        emit StabilityPoolAddressChanged(_stabilityPoolAddress);
+        emit GasPoolAddressChanged(_gasPoolAddress);
+        emit CollSurplusPoolAddressChanged(_collSurplusPoolAddress);
+        emit PriceFeedAddressChanged(_priceFeedAddress);
+        emit SortedTrovesAddressChanged(_sortedTrovesAddress);
+        emit LUSDTokenAddressChanged(_lusdTokenAddress);
+        emit LQTYStakingAddressChanged(_lqtyStakingAddress);
+
+        _renounceOwnership();
+        // END COPYPASTE
+
+        lendingPool = ILendingPool(_lendingPool);
+        feeDistributor = IFeeDistributor(_feeDistributor);
     }
 
     /**
@@ -56,7 +125,7 @@ contract BorrowerOperationsDai is BorrowerOperations {
         uint _netDebtIncrease
     ) internal override {
         _activePool.increaseLUSDDebt(_netDebtIncrease);
-        _lendingPool.take(_LUSDAmount);
+        lendingPool.take(_LUSDAmount);
         _lusdToken.transfer(_account, _LUSDAmount);
     }
 
@@ -79,10 +148,10 @@ contract BorrowerOperationsDai is BorrowerOperations {
         _requireUserAcceptsFee(LUSDFee, _LUSDAmount, _maxFeePercentage);
 
         // increase user's debt by _LUSDFee, giving the fee to the _feeDistributor
-        _withdrawLUSD(activePool, _lusdToken, address(_feeDistributor), LUSDFee, LUSDFee);
+        _withdrawLUSD(activePool, _lusdToken, address(this), LUSDFee, LUSDFee);
 
-        _lusdToken.approve(address(_feeDistributor), LUSDFee);
-        _feeDistributor.pushFees(LUSDFee);
+        _lusdToken.approve(address(feeDistributor), LUSDFee);
+        feeDistributor.pushFees(LUSDFee);
         return LUSDFee;
     }
 
@@ -95,10 +164,10 @@ contract BorrowerOperationsDai is BorrowerOperations {
         ILUSDToken _lusdToken,
         address _account,
         uint _LUSD
-    ) internal override ensureAllowanceIsAtLeast(address(this), address(_lendingPool), _LUSD) {
+    ) internal override ensureAllowanceIsAtLeast(address(this), address(lendingPool), _LUSD) {
         _activePool.decreaseLUSDDebt(_LUSD);
         _lusdToken.transferFrom(_account, address(this), _LUSD);
-        _lendingPool.give(_LUSD);
+        lendingPool.give(_LUSD);
     }
 
 }
