@@ -148,7 +148,7 @@ contract BorrowerOperationsDai is BorrowerOperations {
         _requireUserAcceptsFee(LUSDFee, _LUSDAmount, _maxFeePercentage);
 
         // increase user's debt by _LUSDFee, giving the fee to the _feeDistributor
-        _withdrawLUSD(activePool, _lusdToken, address(feeDistributor), LUSDFee, LUSDFee);
+        _withdrawLUSD(activePool, _lusdToken, address(this), LUSDFee, LUSDFee);
 
         _lusdToken.approve(address(feeDistributor), LUSDFee);
         feeDistributor.pushFees(LUSDFee);
